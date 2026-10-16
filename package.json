@@ -17,5 +17,17 @@
   "bugs": {
     "url": "https://github.com/0-YOUSEF-0/Usage-and-Quota-Service/issues"
   },
-  "homepage": "https://github.com/0-YOUSEF-0/Usage-and-Quota-Service#readme"
+  "homepage": "https://github.com/0-YOUSEF-0/Usage-and-Quota-Service#readme",
+  "dependencies": {
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
 }
