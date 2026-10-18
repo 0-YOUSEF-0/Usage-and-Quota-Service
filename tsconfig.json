@@ -1,0 +1,13 @@
+{
+
+    "compilerOptions":{
+        "target": "es2025",
+        "module": "commonjs",
+        "rootDir": "src",
+        "outDir":"dist",
+        "strict": true,                    // to catch mistakes at early stages
+        "esModuleInterop": true,           // let us write import express from "express"
+        "skipLibCheck": true
+    },
+    "include":["src"]            //compile files under src 
+} 
