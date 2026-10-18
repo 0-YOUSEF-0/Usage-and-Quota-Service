@@ -1,5 +1,5 @@
-{
-
+{            // this file for Configure TypeScript
+           
     "compilerOptions":{
         "target": "es2025",
         "module": "commonjs",
