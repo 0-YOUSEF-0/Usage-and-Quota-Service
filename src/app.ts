@@ -9,7 +9,8 @@ app.get("/health", async (_req, res) => {
   try {
     await pool.query("SELECT 1");
     res.status(200).json({ status: "ok", database: "up" });
-  } catch {
+  } catch (err) {
+    console.error("Health check failed:", err);
     res.status(503).json({ status: "degraded", database: "down" });
   }
 });

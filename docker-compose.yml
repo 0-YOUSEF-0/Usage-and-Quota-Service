@@ -19,11 +19,11 @@ services:
   app:
     build: .
     depends_on:
-      db:
+      database:
         condition: service_healthy
     environment:
       PORT: 3000
-      DATABASE_URL: postgres://${POSTGRES_USER:-metering}:${POSTGRES_PASSWORD:-metering_dev_password}@db:5432/${POSTGRES_DB:-metering}
+      DATABASE_URL: postgres://${POSTGRES_USER:-metering}:${POSTGRES_PASSWORD:-metering_dev_password}@database:5432/${POSTGRES_DB:-metering}
     ports:
       - "3000:3000"
     healthcheck:
