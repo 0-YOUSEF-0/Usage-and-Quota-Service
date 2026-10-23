@@ -4,7 +4,7 @@ CREATE TABLE plans (
 
    account_id       UUID,  -- Owner of a custom plan.
 
-   name             TEXT NOT NULL      -- Plan name with condition to make sure it has a fixed length 
+   name             TEXT NOT NULL   -- Plan name with condition to make sure it has a fixed length 
    CHECK (CHAR_LENGTH(BTRIM(name)) BETWEEN 1 AND 58), 
     
    description    TEXT,      --description of the plan.
@@ -38,3 +38,20 @@ CREATE UNIQUE INDEX plans_predefined_name_uniq
 CREATE UNIQUE INDEX plans_custom_name_uniq
   ON plans (account_id, lower(name))
   WHERE account_id IS NOT NULL;
+
+  --  --------------------------------------------------------- --
+  CREATE TABLE accounts (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(), -- the same we used UUID  
+  name          text NOT NULL       
+  CHECK (char_length(btrim(name)) BETWEEN 1 AND 160),   -- the length of the name is between 1 and 160 char 
+  api_key_hash  text NOT NULL UNIQUE,    -- the service want to know which account made the request (api_key like secret password for its account.)
+  plan_id       uuid NOT NULL REFERENCES plans (id),  -- foriegh key 
+  created_at    timestamptz NOT NULL DEFAULT now()     -- it shows the time and date this account was created 
+);
+
+
+ALTER TABLE plans  -- Now that accounts exist plans can point at their owner.
+  ADD CONSTRAINT plans_account_fk
+  FOREIGN KEY (account_id) REFERENCES accounts (id);
+  -- --------------------------------------------------------- --
+  
