@@ -77,3 +77,10 @@ CREATE TABLE account_usage (
   PRIMARY KEY   (account_id, usage_month)
 );
 -- -------------------------------------------------- --
+CREATE TABLE user_usage (
+  user_id        uuid NOT NULL REFERENCES users (id),
+  usage_month    date NOT NULL CHECK (EXTRACT(DAY FROM usage_month) = 1),
+  units_used     bigint NOT NULL DEFAULT 0 CHECK (units_used >= 0),
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY   (user_id, usage_month)
+);
