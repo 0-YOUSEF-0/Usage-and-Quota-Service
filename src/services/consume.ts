@@ -64,19 +64,28 @@ function toView(state: LevelState): LevelView {
   return { ...state, remaining: remainingOf(state) };
 }
 
-async function findHistory(client: PoolClient, accountId: string, requestId: string) {
+async function findHistory(
+  client: PoolClient,
+  accountId: string,
+  requestId: string
+) {
   const { rows } = await client.query<HistoryRow>(
     `SELECT user_id, units, accepted, rejected_level, rejected_rule, usage_month, details
        FROM request_history
       WHERE account_id = $1 AND request_id = $2`,
     [accountId, requestId]
   );
+
   return rows[0];
 }
 
 // A repeated request ID returns the ORIGINAL answer and counts nothing.
 // The same ID with different details is a client mistake (409).
-function replayDecision(row: HistoryRow, input: ConsumeInput, userId: string): Decision {
+function replayDecision(
+  row: HistoryRow,
+  input: ConsumeInput,
+  userId: string
+): Decision {
   if (row.user_id !== userId || row.units !== input.units) {
     throw new HttpError(
       409,
@@ -109,32 +118,30 @@ async function decide(
   userId: string,
   month: string
 ): Promise<Decision> {
-  // 1. Lock the account's usage row (creating it if this is the first use this month).
+  // 1. Lock the account's usage row, creating it if this is the first use this month.
   //    All consumes for one account wait here, one at a time.
-  await client.query(
-    `INSERT INTO account_usage (account_id, usage_month) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`,
-    [input.accountId, month]
-  );
   const accountUsage = await client.query<{ units_used: number }>(
-    `SELECT units_used FROM account_usage
-      WHERE account_id = $1 AND usage_month = $2 FOR UPDATE`,
+    `INSERT INTO account_usage (account_id, usage_month) VALUES ($1, $2)
+     ON CONFLICT (account_id, usage_month)
+     DO UPDATE SET updated_at = account_usage.updated_at
+     RETURNING units_used`,
     [input.accountId, month]
   );
 
   // 2. Retry check. Safe now, because requests of this account take turns.
   const existing = await findHistory(client, input.accountId, input.requestId);
-  if (existing) return replayDecision(existing, input, userId);
 
-  // 3. Lock the user's usage row. Always account first, then user: no deadlocks.
-  await client.query(
-    `INSERT INTO user_usage (user_id, usage_month) VALUES ($1, $2)
-     ON CONFLICT DO NOTHING`,
-    [userId, month]
-  );
+  if (existing) {
+    return replayDecision(existing, input, userId);
+  }
+
+  // 3. Lock the user's usage row, creating it if this is the first use this month.
+  //    Account first, then user: all consumes follow the same lock order.
   const userUsage = await client.query<{ units_used: number }>(
-    `SELECT units_used FROM user_usage
-      WHERE user_id = $1 AND usage_month = $2 FOR UPDATE`,
+    `INSERT INTO user_usage (user_id, usage_month) VALUES ($1, $2)
+     ON CONFLICT (user_id, usage_month)
+     DO UPDATE SET updated_at = user_usage.updated_at
+     RETURNING units_used`,
     [userId, month]
   );
 
@@ -153,6 +160,7 @@ async function decide(
       WHERE a.id = $1`,
     [input.accountId, userId]
   );
+
   const p = planResult.rows[0];
 
   const accountState: LevelState = {
@@ -162,6 +170,7 @@ async function decide(
     maxUnitsPerRequest: p.account_max_per_request,
     unitsUsed: accountUsage.rows[0].units_used,
   };
+
   const userState: LevelState = {
     planId: p.user_plan_id,
     planName: p.user_plan_name,
@@ -172,6 +181,7 @@ async function decide(
 
   // 5. Decide.
   const rejection = evaluate(input.units, userState, accountState);
+
   const message = rejection
     ? describeRejection(rejection, input.units, userState, accountState)
     : null;
@@ -183,17 +193,23 @@ async function decide(
         WHERE account_id = $1 AND usage_month = $2`,
       [input.accountId, month, input.units]
     );
+
     await client.query(
       `UPDATE user_usage SET units_used = units_used + $3, updated_at = now()
         WHERE user_id = $1 AND usage_month = $2`,
       [userId, month, input.units]
     );
+
     accountState.unitsUsed += input.units;
     userState.unitsUsed += input.units;
   }
 
   // 7. Record the decision, with a snapshot of the limits that applied.
-  const details = { message, user: toView(userState), account: toView(accountState) };
+  const details = {
+    message,
+    user: toView(userState),
+    account: toView(accountState),
+  };
 
   await client.query(
     `INSERT INTO request_history
@@ -226,20 +242,27 @@ async function decide(
 }
 
 // `now` can be passed in tests to pretend it is another month.
-export async function consume(input: ConsumeInput, now: Date = new Date()): Promise<Decision> {
+export async function consume(
+  input: ConsumeInput,
+  now: Date = new Date()
+): Promise<Decision> {
   // The user must belong to the calling account (otherwise 404).
   const userResult = await pool.query<{ id: string }>(
     "SELECT id FROM users WHERE account_id = $1 AND external_id = $2",
     [input.accountId, input.externalId]
   );
+
   if (userResult.rows.length === 0) {
     throw new HttpError(404, "user_not_found", "User not found.");
   }
+
   const userId = userResult.rows[0].id;
   const month = currentUsageMonth(now);
 
   try {
-    return await withTransaction((client) => decide(client, input, userId, month));
+    return await withTransaction((client) =>
+      decide(client, input, userId, month)
+    );
   } catch (err) {
     // Safety net: if two identical requests ever raced past the check,
     // the database's unique key stops the second one. Answer with the first result.
@@ -247,8 +270,13 @@ export async function consume(input: ConsumeInput, now: Date = new Date()): Prom
       const existing = await withClient((client) =>
         findHistory(client, input.accountId, input.requestId)
       );
-      if (existing) return replayDecision(existing, input, userId);
+
+      if (existing) {
+        return replayDecision(existing, input, userId);
+      }
     }
+
     throw err;
   }
 }
+
