@@ -39,19 +39,31 @@ CREATE UNIQUE INDEX plans_custom_name_uniq
   ON plans (account_id, lower(name))
   WHERE account_id IS NOT NULL;
 
-  --  --------------------------------------------------------- --
-  CREATE TABLE accounts (
+--  --------------------------------------------------------- --
+ CREATE TABLE accounts (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(), -- the same we used UUID  
   name          text NOT NULL       
   CHECK (char_length(btrim(name)) BETWEEN 1 AND 160),   -- the length of the name is between 1 and 160 char 
   api_key_hash  text NOT NULL UNIQUE,    -- the service want to know which account made the request (api_key like secret password for its account.)
   plan_id       uuid NOT NULL REFERENCES plans (id),  -- foriegh key 
   created_at    timestamptz NOT NULL DEFAULT now()     -- it shows the time and date this account was created 
-);
+ );
 
 
 ALTER TABLE plans  -- Now that accounts exist plans can point at their owner.
   ADD CONSTRAINT plans_account_fk
   FOREIGN KEY (account_id) REFERENCES accounts (id);
-  -- --------------------------------------------------------- --
   
+-- --------------------------------------------------------- --
+CREATE TABLE users (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id   uuid NOT NULL REFERENCES accounts (id),
+  external_id  text NOT NULL
+               CHECK (char_length(btrim(external_id)) BETWEEN 1 AND 200),
+  name         text,
+  plan_id      uuid NOT NULL REFERENCES plans (id),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT users_account_external_uniq UNIQUE (account_id, external_id),  --account cannot have two users with the same external ID.
+  CONSTRAINT users_id_account_uniq UNIQUE (id, account_id)  -- table( user_usage)  need to reference both the user and the account together.
+);
+-- ---------------------------------------------------- --
