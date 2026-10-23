@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { HttpError } from "./errors";
+export const uuidSchema = z
+  .string()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    "Must be a UUID"
+  );
 
 // Checks data against a schema, or throws a 400 listing every problem.
 export function parseWith<T extends z.ZodType>(schema: T, data: unknown): z.infer<T> {
@@ -16,6 +22,7 @@ export function parseWith<T extends z.ZodType>(schema: T, data: unknown): z.infe
       }))
     );
   }
+  
 
   return result.data as z.infer<T>;
 }
