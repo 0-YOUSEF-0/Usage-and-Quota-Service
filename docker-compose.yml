@@ -34,5 +34,15 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  client:
+    build: ./client
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      API_URL: http://app:3000
+    restart: "no"
+
 volumes:
   pgdata:
+
