@@ -5,6 +5,7 @@ import { accountsRouter } from "./routes/accounts";
 import { usersRouter } from "./routes/users";
 import { plansRouter } from "./routes/plans";
 import { consumeRouter } from "./routes/consume";
+import { reportsRouter } from "./routes/reports";
 
 const app = express();
 
@@ -25,6 +26,8 @@ app.use(accountsRouter);
 app.use("/users", usersRouter);
 app.use("/plans", plansRouter);
 app.use(consumeRouter);
+app.use(reportsRouter);
+
 
 app.use(notFoundHandler);
 app.use(errorHandler);
