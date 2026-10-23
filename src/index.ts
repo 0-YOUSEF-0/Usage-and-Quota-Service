@@ -1,8 +1,17 @@
-// this file start s the server 
 import app from "./app";
+import { runMigrations } from "./database/migrate";
 
-const PORT = Number(process.env.PORT) || 3000;      // the server will run on port 3000
+const PORT = Number(process.env.PORT) || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Server listening on http://localhost:${PORT}`);
+async function main(): Promise<void> {
+  await runMigrations();
+
+  app.listen(PORT, () => {
+    console.log(`Server listening on http://localhost:${PORT}`);
+  });
+}
+
+main().catch((err) => {
+  console.error("Failed to start:", err);
+  process.exit(1);
 });
