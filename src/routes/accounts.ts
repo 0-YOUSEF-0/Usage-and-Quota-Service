@@ -7,6 +7,7 @@ import { asyncHandler } from "../http/errors";
 import { parseWith, uuidSchema } from "../http/validate";
 import { authenticate } from "../middleware/authenticate";
 import { assertPlanAssignable } from "../services/planAccess";
+import { currentUsageMonth } from "../domain/month";
 
 export const accountsRouter = Router();
 
@@ -16,16 +17,21 @@ const createAccountSchema = z.object({
 
 const changeAccountPlanSchema = z.object({ planId: uuidSchema });
 
-// The account with its current plan, in the shape we return to callers.
+// The account with its current plan and this month's usage.
 async function loadAccount(accountId: string) {
+  const month = currentUsageMonth();
+
   const { rows } = await pool.query(
     `SELECT a.id, a.name, a.created_at,
             p.id AS plan_id, p.name AS plan_name,
-            p.monthly_limit, p.max_units_per_request, p.is_predefined
+            p.monthly_limit, p.max_units_per_request, p.is_predefined,
+            COALESCE(au.units_used, 0) AS units_used
        FROM accounts a
        JOIN plans p ON p.id = a.plan_id
+       LEFT JOIN account_usage au
+              ON au.account_id = a.id AND au.usage_month = $2::date
       WHERE a.id = $1`,
-    [accountId]
+    [accountId, month]
   );
   const row = rows[0];
 
@@ -39,6 +45,12 @@ async function loadAccount(accountId: string) {
       monthlyLimit: row.monthly_limit,
       maxUnitsPerRequest: row.max_units_per_request,
       isPredefined: row.is_predefined,
+    },
+    usage: {
+      month,
+      unitsUsed: row.units_used,
+      // Never negative, even if the limit was lowered below current usage.
+      remaining: Math.max(0, row.monthly_limit - row.units_used),
     },
   };
 }
