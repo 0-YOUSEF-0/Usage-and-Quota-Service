@@ -30,7 +30,6 @@ CREATE TABLE plans (
    CONSTRAINT plans_predefined_has_no_owner
   CHECK (is_predefined = (account_id IS NULL))
 );
-
 CREATE UNIQUE INDEX plans_predefined_name_uniq
   ON plans (lower(name))
   WHERE account_id IS NULL;
@@ -38,7 +37,6 @@ CREATE UNIQUE INDEX plans_predefined_name_uniq
 CREATE UNIQUE INDEX plans_custom_name_uniq
   ON plans (account_id, lower(name))
   WHERE account_id IS NOT NULL;
-
 --  --------------------------------------------------------- --
  CREATE TABLE accounts (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(), -- the same we used UUID  
@@ -49,11 +47,10 @@ CREATE UNIQUE INDEX plans_custom_name_uniq
   created_at    timestamptz NOT NULL DEFAULT now()     -- it shows the time and date this account was created 
  );
 
-
 ALTER TABLE plans  -- Now that accounts exist plans can point at their owner.
   ADD CONSTRAINT plans_account_fk
   FOREIGN KEY (account_id) REFERENCES accounts (id);
-  
+
 -- --------------------------------------------------------- --
 CREATE TABLE users (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -84,3 +81,35 @@ CREATE TABLE user_usage (
   updated_at     timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY   (user_id, usage_month)
 );
+CREATE TABLE request_history (
+  id              bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  account_id      uuid NOT NULL REFERENCES accounts (id),
+  user_id         uuid NOT NULL,
+  request_id      text NOT NULL
+                  CHECK (char_length(request_id) BETWEEN 1 AND 200),
+  units           bigint NOT NULL CHECK (units > 0),
+  accepted        boolean NOT NULL,
+  rejected_level  text CHECK (rejected_level IN ('account', 'user')),
+  rejected_rule   text CHECK (rejected_rule IN ('max_units_per_request', 'monthly_allowance')),
+  usage_month     date NOT NULL CHECK (EXTRACT(DAY FROM usage_month) = 1),
+  details         jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+
+  
+  CONSTRAINT request_history_user_account_fk  -- The user must belong to this exact account (checked by the database).
+    FOREIGN KEY (user_id, account_id) REFERENCES users (id, account_id),
+
+ 
+  CONSTRAINT request_history_account_request_uniq   -- Idempotency: the same request_id can only be recorded once per account.
+    UNIQUE (account_id, request_id),
+
+ 
+  CONSTRAINT request_history_outcome_consistent CHECK (   -- An accepted request has no rejection info and a  rejected one has both.
+    (accepted AND rejected_level IS NULL AND rejected_rule IS NULL)
+    OR
+    (NOT accepted AND rejected_level IS NOT NULL AND rejected_rule IS NOT NULL)
+  )
+);
+
+CREATE INDEX request_history_account_idx ON request_history (account_id, id DESC);  -- Listing history newest first  for an account or for one user
+CREATE INDEX request_history_user_idx    ON request_history (user_id, id DESC);
