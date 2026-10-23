@@ -1,10 +1,13 @@
-// this file will describe the routes and settings 
 import express from "express";
-import { pool } from "./database/pool"
+import { pool } from "./database/pool";
+import { errorHandler, notFoundHandler } from "./http/errors";
+import { accountsRouter } from "./routes/accounts";
 
+const app = express();
 
-const app =express();
-app.use(express.json())
+app.disable("x-powered-by");
+app.use(express.json());
+
 app.get("/health", async (_req, res) => {
   try {
     await pool.query("SELECT 1");
@@ -14,5 +17,11 @@ app.get("/health", async (_req, res) => {
     res.status(503).json({ status: "degraded", database: "down" });
   }
 });
+
+app.use(accountsRouter);
+
+// These two must stay LAST.
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;
