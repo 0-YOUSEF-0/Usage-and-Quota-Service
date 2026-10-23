@@ -4,6 +4,7 @@ import { errorHandler, notFoundHandler } from "./http/errors";
 import { accountsRouter } from "./routes/accounts";
 import { usersRouter } from "./routes/users";
 import { plansRouter } from "./routes/plans";
+import { consumeRouter } from "./routes/consume";
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.get("/health", async (_req, res) => {
 app.use(accountsRouter);
 app.use("/users", usersRouter);
 app.use("/plans", plansRouter);
+app.use(consumeRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
