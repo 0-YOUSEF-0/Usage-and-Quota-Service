@@ -22,3 +22,9 @@ COPY migrations ./migrations
 USER node
 EXPOSE 3000
 CMD ["node", "dist/index.js"]
+
+FROM node:22-alpine
+WORKDIR /app
+COPY demo.mjs ./
+USER node
+CMD ["node", "demo.mjs"]
