@@ -67,3 +67,13 @@ CREATE TABLE users (
   CONSTRAINT users_id_account_uniq UNIQUE (id, account_id)  -- table( user_usage)  need to reference both the user and the account together.
 );
 -- ---------------------------------------------------- --
+CREATE TABLE account_usage (
+  account_id     uuid NOT NULL REFERENCES accounts (id),
+  usage_month    date NOT NULL 
+  CHECK (EXTRACT(DAY FROM usage_month) = 1),
+  units_used    bigint NOT NULL DEFAULT 0 
+  CHECK (units_used >= 0),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY   (account_id, usage_month)
+);
+-- -------------------------------------------------- --
